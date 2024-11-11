@@ -2,68 +2,55 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "../headers/__init__.h"
+#include "../headers/table.h"
 
-Table *NewTable(String *name, String data) {
+Table *NewTable(const char *name, const char *key_line) {
     Table *t = (Table *)malloc(sizeof(Table));
-    *t = (Table) {
-        .Name       = NewString(name->data),
+    *t = (Table){
+        .Name       = strdup(name),
         .Keys       = (char **)malloc(sizeof(char *) * 1),
         .KeyCount   = 0,
-        .Rows       = (Array **)malloc(sizeof(Array *) * 1),
 
-        .AddTable   = AppendKey,
+        .Rows       = (char **)malloc(sizeof(char *) * 1),
+        .RowCount   = 0,
+
         .Destruct   = DestroyTable
     };
 
-    data.TrimAt(&data, 0);
-    data.TrimAt(&data, data.idx);
-    data.Trim(&data, ')');
-
-    char **raw_args = data.Split(&data, "','");
+    String keys = NewString(key_line);
     Array args = NewArray(NULL);
-    args.Merge(&args, (void **)raw_args);
+    args.Merge(&args, (void **)keys.Split(&keys, "','"));
+    args.arr[args.idx] = NULL;
 
     for(int i = 0; i < args.idx; i++) {
-        String arg = NewString(args.arr[i]);
-        if(!strcmp(arg.data, ")"))
-            continue;
+        if(!args.arr[i])
+            break;
 
-        t->Keys[t->KeyCount] = strdup(arg.data);
+        t->Keys[t->KeyCount] = strdup(args.arr[i]);
         t->KeyCount++;
         t->Keys = (char **)realloc(t->Keys, sizeof(char *) * (t->KeyCount + 1));
     }
 
+    t->Keys[t->KeyCount] = NULL;
+
+    args.Destruct(&args);
+    keys.Destruct(&keys);
     return t;
 }
 
-void print_table(Table *t) {
-    for(int i = 0; i < t->RowCount; i++) {
-        for(int idx = 0; idx < t->Rows[i]->idx; idx++) {
-            printf("%s", (char *)t->Rows[i]->arr[idx]);
-        }
-    }
-}
-
-int AppendKey(Table *t, const char *k) {
-    if(!t)
-        return 0;
-
-    t->Keys[t->KeyCount] = strdup(k);
-    t->KeyCount++;
-    t->Keys = (char **)realloc(t->Keys, sizeof(char *) * (t->KeyCount + 1));
-}
-
 void DestroyTable(Table *t) {
-    if(t->Name.data)
-        t->Name.Destruct(&t->Name);
+    if(t->Name)
+        free(t->Name);
 
-    if(t->KeyCount > 0) {
+    if(t->Keys) {
         for(int i = 0; i < t->KeyCount; i++)
-            free(t->Keys[i]);
-
-        free(t->Keys);
+            if(t->Keys[i])
+                free(t->Keys[i]);
     }
 
-    free(t);
+    if(t->Rows) {
+        for(int i = 0; i < t->RowCount; i++)
+            if(t->Rows[i])
+                free(t->Rows[i]);
+    }
 }

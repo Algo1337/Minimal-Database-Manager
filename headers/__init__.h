@@ -3,35 +3,24 @@
 #include <str.h>
 #include <arr.h>
 
-typedef struct Table {
-    String  Name;
+#include "table.h"
 
-    char    **Keys;
-    long    KeyCount;
-
-    Array   **Rows;
-    long    RowCount;
-
-    int     (*AddTable)     (struct Table *t, const char *k);
-    void    (*Destruct)     (struct Table *t);
-} Table;
-
-typedef struct HeinekenDB {
-    String  Path;
-    FILE    *Connection;
-    String  Data;
+typedef struct Database {
+    char    *Name;
 
     Table   **Tables;
     long    TableCount;
-}  HeinekenDB;
 
-HeinekenDB      *InitDatabase(const char *db_name);
+    char    *Data;
+    FILE    *Con;
+} Database;
 
-int             RetrieveTables(HeinekenDB *db);
-int             ParseDB(HeinekenDB *db);
-int             ParseTable(HeinekenDB *db, Table *t, Array lines, int line_num);
-void            print_table(Table *t);
+Database    *InitDb(const char *db_name);
+int         RetrieveDatabase(Database *db);
+int         ParseTables(Database *db);
 
-Table           *NewTable(String *name, String data);
-int             AppendKey(Table *t, const char *k);
-void            DestroyTable(Table *t);
+// == [ MANAGER ] ==
+
+Table *FindTable(Database *db, const char *table_name);
+int AppendTable(Database *db, Table *new);
+int RemoveTable(Database *db, Table *rm);

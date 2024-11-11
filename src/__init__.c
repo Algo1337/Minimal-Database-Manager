@@ -4,116 +4,81 @@
 
 #include "../headers/__init__.h"
 
-HeinekenDB *InitDatabase(const char *db_name) {
-    HeinekenDB *db = (HeinekenDB *)malloc(sizeof(HeinekenDB));
-    *db = (HeinekenDB){
-        .Path = NewString(db_name),
-        .Tables = (Table **)malloc(sizeof(Table *) * 1),
-        .TableCount = 0
+Database *InitDb(const char *db_name) {
+    Database *db = (Database *)malloc(sizeof(Database));
+    *db = (Database){
+        .Name           = (char *)malloc(strlen(db_name) + 4),
+        .Tables         = (Table **)malloc(sizeof(Table *) * 1),
+        .TableCount     = 0
     };
 
-    db->Path.AppendString(&db->Path, ".db");
-    RetrieveTables(db);
-    ParseDB(db);
+    memset(db->Name, '\0', strlen(db_name) + 4);
+    strcpy(db->Name, db_name);
+    strcat(db->Name, ".db");
     
+    db->Con = fopen(db->Name, "r+");
+    if(!db->Con)
+        return NULL;
+
+    RetrieveDatabase(db);
+    ParseTables(db);
+
     return db;
 }
 
-int ParseDB(HeinekenDB *db) {
-    if(!db)
-        return 0;
+int RetrieveDatabase(Database *db) {
+    fseek(db->Con, 0L, SEEK_END);
+    long sz = ftell(db->Con);
+    fseek(db->Con, 0L, SEEK_SET);
 
-    char **lines_arr = db->Data.Split(&db->Data, "\n");
-    Array lines = NewArray(NULL);
-    lines.Merge(&lines, (void **)lines_arr);
+    db->Data = (char *)malloc(sz);
+    memset(db->Data, '\0', sz);
 
-    for(int i = 0; i < lines.idx; i++) {
-        String line = NewString(lines.arr[i]);
-        if(line.isEmpty(&line) || i == lines.idx - 1) {
-            line.Destruct(&line);
-            continue;
-        }
-
-        if(strstr(line.data, "[@TABLE")) {
-            String next_line = NewString(lines.arr[i + 1]);
-
-            line.TrimAt(&line, line.idx - 1);
-            char *table_name = line.GetSubstr(&line, 9, line.idx - 1);
-            String tble = NewString(table_name);
-
-            db->Tables[db->TableCount] = NewTable(&tble, next_line);
-            db->TableCount++;
-            db->Tables = (Table **)realloc(db->Tables, sizeof(Table *) * (db->TableCount + 1));
-
-            ParseTable(db, db->Tables[db->TableCount - 1], lines, i);
-
-            next_line.Destruct(&next_line);
-            tble.Destruct(&tble);
-        }
-
-        line.Destruct(&line);
-    }
-
-    db->Tables[db->TableCount] = NULL;
-
-    lines.Destruct(&lines);
-    return 1;
+    fread(db->Data, sz, 1, db->Con);
+    return strlen(db->Data);
 }
 
-int ParseTable(HeinekenDB *db, Table *t, Array lines, int line_num) {
-    for(int i = line_num; i < lines.idx; i++) {
+int ParseTables(Database *db) {
+    String raw_data = NewString(db->Data);
+    raw_data.Trim(&raw_data, '(');
+    raw_data.Trim(&raw_data, ')');
+
+    Array lines = NewArray(NULL);
+    lines.Merge(&lines, (void **)raw_data.Split(&raw_data, "\n"));
+    for(int i = 0; i < lines.idx; i++)
+    {
+        if(!lines.arr[i])
+            break;
+
         String line = NewString(lines.arr[i]);
+        Array args = NewArray(NULL);
+        args.Merge(&args, (void **)line.Split(&line, "','"));
+        args.arr[args.idx - 1] = NULL;
+        
         if(line.isEmpty(&line))
             break;
 
-        line.TrimAt(&line, 0);
-        line.TrimAt(&line, line.idx);
-        line.Trim(&line, ')');
-
-        char **args_arr = line.Split(&line, "','");
-        Array args = NewArray(NULL);
-        args.Merge(&args, (void **)args_arr);
-
-        if(args.idx != t->KeyCount) {
-            printf("[ x ] Corrupted Line......\r\n\t = > %s\r\n", line.data);
+        if(strstr(line.data, "[@TABLE")) {
+            char *name = line.GetSubstr(&line, 9, line.idx - 1);
+            Table *new = NewTable(name, (const char *)lines.arr[i + 1]);
+            AppendTable(db, new);
+            i++;
             line.Destruct(&line);
             args.Destruct(&args);
             continue;
         }
 
-        t->Rows[t->RowCount] = (Array *)malloc(sizeof(Array));
-        t->Rows[t->RowCount] = &args;
+        if(db->TableCount > 0)
+            printf("%ld => %ld\n", args.idx, db->Tables[db->TableCount - 1]->KeyCount);
 
-        t->RowCount++;
-        t->Rows = (Array **)realloc(t->Rows, sizeof(Array *) * (t->RowCount + 1));
-        
+        if(args.idx < 7) {
+            printf("Corrupted Line.....!\r\n\t= > %s\n", line.data);
+            line.Destruct(&line);
+            args.Destruct(&args);
+            continue;
+        }
+
         line.Destruct(&line);
+        args.Destruct(&args);
     }
-}
-
-int RetrieveTables(HeinekenDB *db) {
-    if(!db)
-        return 0;
-
-    db->Connection = fopen(db->Path.data, "r+");
-    if(!db->Connection)
-        return 0;
-
-    fseek(db->Connection, 0L, SEEK_END);
-    long sz = ftell(db->Connection);
-    fseek(db->Connection, 0L, SEEK_SET);
-
-    char *Data = (char *)malloc(sz);
-    if(!Data)
-        return 0;
-
-    memset(Data, '\0', sz);
-
-    fread(Data, sz, 1, db->Connection);
-    fclose(db->Connection);
-
-    db->Data = NewString(Data);
-    free(Data);
-
-    return 1;
 }
