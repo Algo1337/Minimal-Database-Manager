@@ -4,6 +4,11 @@
 
 #include "../headers/__init__.h"
 
+Table *Select(Database *db, const char *table_name, Table *dest) {
+    dest = FindTable(db, table_name);
+    return dest;
+}
+
 Table *FindTable(Database *db, const char *table_name) {
     if(!db)
         return NULL;

@@ -9,7 +9,10 @@ Database *InitDb(const char *db_name) {
     *db = (Database){
         .Name           = (char *)malloc(strlen(db_name) + 4),
         .Tables         = (Table **)malloc(sizeof(Table *) * 1),
-        .TableCount     = 0
+        .TableCount     = 0,
+
+        .Select         = Select,
+        .Destruct       = DestroyDB
     };
 
     memset(db->Name, '\0', strlen(db_name) + 4);
@@ -68,9 +71,6 @@ int ParseTables(Database *db) {
             continue;
         }
 
-        if(db->TableCount > 0)
-            printf("%ld => %ld\n", args.idx, db->Tables[db->TableCount - 1]->KeyCount);
-
         if(args.idx < 7) {
             printf("Corrupted Line.....!\r\n\t= > %s\n", line.data);
             line.Destruct(&line);
@@ -78,7 +78,36 @@ int ParseTables(Database *db) {
             continue;
         }
 
+        if(db->TableCount > 0)
+            AppendRow(db->Tables[db->TableCount - 1], line.data);
+
         line.Destruct(&line);
         args.Destruct(&args);
     }
+
+    raw_data.Destruct(&raw_data);
+    lines.Destruct(&lines);
+    return 1;
+}
+
+void DestroyDB(Database *db) {
+    if(db->Name)
+        free(db->Name);
+
+    if(db->Tables) {
+        for(int i = 0; i < db->TableCount; i++) {
+            db->Tables[i]->Destruct(db->Tables[i]);
+            db->Tables[i] = NULL;
+        }
+        free(db->Tables);
+        db->Tables = NULL;
+    }
+
+    if(db->Data)
+        free(db->Data);
+
+    if(db->Con)
+        fclose(db->Con);
+
+    free(db);
 }
