@@ -22,12 +22,8 @@ int main(int argc, char *argv[]) {
         printf("\r\n");
     }
 
-    Table *table = NULL;
-    
-    // Get a another user's row value searching under another row column for a query 
-    // (Where() and Query() must be used together)
-    table = db->Select(db, "USERS", table);
-    table = table->Get(table, "PASSWORD")->Where(table, "USERNAME")->Query(table, "jeffybob");
+    Table *table = db->Select(db, "USERS", table);
+    table->Get(table, "PASSWORD")->Where(table, "USERNAME")->Query(table, "jeffybob");
 
     char *db_query = (char *)table->Execute(table);
     printf("%s\n", db_query);
