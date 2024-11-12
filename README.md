@@ -14,6 +14,7 @@ cd Minimal-Database-Manager; make
 
 # How to Use
 ```
+Database *db = InitDb("users"); // Get a pipe stream for the database
 Table *users_db = db->Select("users"); // Get a pipe stream for a table in the database
 
 users_db->Get("PASSWORD")->Where("USERNAME")->Query("Jeffybob"); // set a query using functions
