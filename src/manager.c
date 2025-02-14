@@ -52,7 +52,7 @@ int RemoveTable(Database *db, Table *rm) {
     long idx = 0;
     for(int i = 0; i < db->TableCount; i++) {
         if(db->Tables[i] == rm) {
-            db->Tables[i]->Destruct(db->Tables[i]);
+            db->Tables[i]->Destruct(db->Tables[i], 1, 1);
             continue;
         }
 

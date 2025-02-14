@@ -96,7 +96,7 @@ void DestroyDB(Database *db) {
 
     if(db->Tables) {
         for(int i = 0; i < db->TableCount; i++) {
-            db->Tables[i]->Destruct(db->Tables[i]);
+            db->Tables[i]->Destruct(db->Tables[i], 1, 1);
             db->Tables[i] = NULL;
         }
         free(db->Tables);

@@ -13,7 +13,9 @@ Table *NewTable(const char *name, const char *key_line) {
 
         .Rows       = (char **)malloc(sizeof(char *) * 1),
         .RowCount   = 0,
+        .CreateRow  = NULL,
 
+        .Create     = CreateRow,
         .Get        = GrabRowColumn,
         .Where      = SearchUnder,
         .Query      = SearchQuery,
@@ -24,20 +26,10 @@ Table *NewTable(const char *name, const char *key_line) {
     String keys = NewString(key_line);
     Array args = NewArray(NULL);
     args.Merge(&args, (void **)keys.Split(&keys, "','"));
-    args.arr[args.idx] = NULL;
 
-    for(int i = 0; i < args.idx; i++) {
-        if(!args.arr[i])
-            break;
+    t->Keys = args.arr;
+    t->KeyCount = args.idx;
 
-        t->Keys[t->KeyCount] = strdup(args.arr[i]);
-        t->KeyCount++;
-        t->Keys = (char **)realloc(t->Keys, sizeof(char *) * (t->KeyCount + 1));
-    }
-
-    t->Keys[t->KeyCount] = NULL;
-
-    args.Destruct(&args);
     keys.Destruct(&keys);
     return t;
 }
@@ -58,6 +50,62 @@ Table *GrabRowColumn(Table *t, const char *col) {
     }
 
     return t;
+}
+
+Table *CreateRow(Table *t, const char **arr) {
+    if(!t || !arr)
+        return NULL;
+
+    Array a = NewArray(NULL);
+    a.Merge(&a, (void **)arr);
+
+    if(t->KeyCount != a.idx) {
+        printf("[ - ] Warning, Invalid key count....!\n");
+        a.Destruct(&a);
+        return NULL;
+    }
+
+    t->CreateRow = (char *)malloc(1);
+    int idx = 0;
+    int i = 0;
+
+    t->CreateRow[0] = '(';
+    t->CreateRow[1] = '\'';
+    while(arr[i] != NULL) {
+        idx += strlen(arr[i]) + 3;
+
+        t->CreateRow = realloc(t->CreateRow, idx);
+        if(!t->CreateRow)
+            printf("HERE\n");
+
+        strcat(t->CreateRow, arr[i]);
+        if(idx == t->KeyCount) {
+            strcat(t->CreateRow, "')");
+            break;
+        }
+
+        strcat(t->CreateRow, "','");
+        i++;
+    }
+
+    return t;
+}
+
+int isColumnValid(Table *t) {
+    if(!t)
+        return -1;
+
+    int x = -1;
+    // Get() find key
+    for(int i = 0; i < t->KeyCount; i++) {
+        if(!t->Keys[i])
+            break;
+
+        if(!strcmp(t->Keys[i], t->SearchUnderColumn))
+            return 1;
+    }
+
+    return -1;
 }
 
 // Where
@@ -88,15 +136,28 @@ Table *SearchQuery(Table *t, const char *q) {
 }
 
 void *ExecuteSearch(Table *t) { 
-    int x = -1;
-    for(int i = 0; i < t->KeyCount; i++) {
-        if(!strcmp(t->Keys[i], t->SearchUnderColumn)) {
-            x = i;
-            break;
-        }
+    // Set
+    // Create()
+    if(t->CreateRow != NULL) {
+        if(t->SearchUnderColumn != NULL) {
+            //insert row after a row
+        } 
+
+        t->Rows[t->RowCount] = t->CreateRow;
+        t->RowCount++;
+        t->Rows = (char **)realloc(t->Rows, sizeof(char *) * (t->RowCount + 1));
+        if(!t->Rows)
+            return NULL;
+
+        return 1;
     }
 
+    int x = isColumnValid(t);
+
+    // Get
+    // Query() and Where()
     if(t->Search && t->SearchUnderColumn) {
+
         int y = -1;
         for(int i = 0; i < t->KeyCount; i++) {
             if(!strcmp(t->Keys[i], t->GrabColumn)) {
@@ -124,9 +185,15 @@ void *ExecuteSearch(Table *t) {
             row.Destruct(&row);
             line_args.Destruct(&line_args);
         }
-        return NULL;
+
+        t->Search = NULL;
+        t->SearchUnderColumn = NULL;
+        t->GrabColumn = NULL;
+        t->CreateRow = NULL;
+        return 1;
     }
 
+    /* Get() only. Return all rows of the specified column */
     if(x == -1)
         return NULL;
 
@@ -145,7 +212,13 @@ void *ExecuteSearch(Table *t) {
         row.Destruct(&row);
         args.Destruct(&args);
     }
+
     arr[idx] = NULL;
+    t->Search = NULL;
+    t->SearchUnderColumn = NULL;
+    t->GrabColumn = NULL;
+    t->CreateRow = NULL;
+
     if(idx > 0)
         return arr;
 
@@ -165,17 +238,17 @@ int AppendRow(Table *t, const char *row) {
     return 1;
 }
 
-void DestroyTable(Table *t) {
+void DestroyTable(Table *t, int destroy_keys, int destroy_rows) {
     if(t->Name)
         free(t->Name);
 
-    if(t->Keys) {
+    if(destroy_keys && t->Keys) {
         for(int i = 0; i < t->KeyCount; i++)
             if(t->Keys[i])
                 free(t->Keys[i]);
     }
 
-    if(t->Rows) {
+    if(destroy_rows && t->Rows) {
         for(int i = 0; i < t->RowCount; i++)
             if(t->Rows[i])
                 free(t->Rows[i]);
